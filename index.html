@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易聊天系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        #chatContainer {
+            display: none;
+            margin-top: 20px;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #e9f7ef;
+        }
+        .message .username {
+            font-weight: bold;
+            color: #2e7d32;
+        }
+        .message .time {
+            font-size: 0.8em;
+            color: #666;
+            margin-left: 10px;
+        }
+        .message .content {
+            margin-top: 5px;
+        }
+        #authTabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #eee;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>简易聊天系统</h1>
+        
+        <!-- 登录/注册选项卡 -->
+        <div id="authTabs">
+            <div class="tab active" onclick="switchTab('login')">登录</div>
+            <div class="tab" onclick="switchTab('register')">注册</div>
+        </div>
+        
+        <!-- 登录表单 -->
+        <div id="loginForm">
+            <div class="form-group">
+                <label for="loginUsername">用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码">
+            </div>
+            <button onclick="login()">登录</button>
+            <div id="loginMessage" class="error"></div>
+        </div>
+        
+        <!-- 注册表单 -->
+        <div id="registerForm" style="display: none;">
+            <div class="form-group">
+                <label for="registerUsername">用户名</label>
+                <input type="text" id="registerUsername" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label for="registerPassword">密码</label>
+                <input type="password" id="registerPassword" placeholder="请输入密码">
+            </div>
+            <button onclick="register()">注册</button>
+            <div id="registerMessage" class="error"></div>
+        </div>
+        
+        <!-- 聊天界面 -->
+        <div id="chatContainer">
+            <h2>聊天室</h2>
+            <div id="messages"></div>
+            <div class="form-group">
+                <label for="messageInput">消息内容</label>
+                <textarea id="messageInput" rows="3" placeholder="输入消息内容..."></textarea>
+            </div>
+            <button onclick="sendMessage()">发送消息</button>
+            <button onclick="loadMessages()" style="background-color: #2196F3;">刷新消息</button>
+            <div id="chatMessage" class="error"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        
+        // 切换登录/注册选项卡
+        function switchTab(tab) {
+            document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+            document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+            
+            const tabs = document.querySelectorAll('#authTabs .tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'login') {
+                tabs[0].classList.add('active');
+            } else {
+                tabs[1].classList.add('active');
+            }
+        }
+        
+        // 登录函数
+        async function login() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            
+            if (!username || !password) {
+                showMessage('loginMessage', '用户名和密码不能为空', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('auth.php?action=login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.user;
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('registerForm').style.display = 'none';
+                    document.getElementById('chatContainer').style.display = 'block';
+                    document.getElementById('authTabs').style.display = 'none';
+                    showMessage('loginMessage', '', 'error');
+                    loadMessages();
+                } else {
+                    showMessage('loginMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('loginMessage', '登录失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 注册函数
+        async function register() {
+            const username = document.getElementById('registerUsername').value.trim();
+            const password = document.getElementById('registerPassword').value.trim();
+            
+            if (!username || !password) {
+                showMessage('registerMessage', '用户名和密码不能为空', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('auth.php?action=register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('registerMessage', '注册成功，请登录', 'success');
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    switchTab('login');
+                    document.getElementById('loginUsername').value = username;
+                } else {
+                    showMessage('registerMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('registerMessage', '注册失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 发送消息函数
+        async function sendMessage() {
+            const message = document.getElementById('messageInput').value.trim();
+            
+            if (!message) {
+                showMessage('chatMessage', '消息内容不能为空', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('chat.php?action=send', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        password: document.getElementById('loginPassword').value,
+                        message: message
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('messageInput').value = '';
+                    showMessage('chatMessage', '', 'error');
+                    loadMessages();
+                } else {
+                    showMessage('chatMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('chatMessage', '发送消息失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 加载消息函数
+        async function loadMessages() {
+            try {
+                const response = await fetch('chat.php?action=get', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const messagesContainer = document.getElementById('messages');
+                    messagesContainer.innerHTML = '';
+                    
+                    if (data.data && data.data.length > 0) {
+                        data.data.forEach(msg => {
+                            const messageDiv = document.createElement('div');
+                            messageDiv.className = 'message';
+                            
+                            const header = document.createElement('div');
+                            header.innerHTML = `<span class="username">${msg.username}</span>
+                                              <span class="time">${msg.timestamp}</span>`;
+                            
+                            const content = document.createElement('div');
+                            content.className = 'content';
+                            content.textContent = msg.message;
+                            
+                            messageDiv.appendChild(header);
+                            messageDiv.appendChild(content);
+                            messagesContainer.appendChild(messageDiv);
+                        });
+                        
+                        // 滚动到底部
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    } else {
+                        messagesContainer.innerHTML = '<div style="text-align: center; color: #666;">暂无消息</div>';
+                    }
+                } else {
+                    showMessage('chatMessage', data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('chatMessage', '获取消息失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示消息函数
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = type;
+        }
+        
+        // 按Enter键发送消息
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
